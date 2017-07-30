@@ -201,7 +201,7 @@ if __name__ == '__main__':
             print('This test case failed:')
             pprint(test_data)
             print("Encrypted: %s (%s)" % (enc_dbg, encrypted == test_data['ciphertext']))
-            print("Tag: %s (%s)" % (tag_dbg, tag == test_data['auth_tag']))
+            print("Tag: %s (%s)" % (tag_dbg, tag == test_tag))
             print("Decrypted: %s (%s)" % (decrypted, decrypted == test_data['plaintext']))
             print()
 
