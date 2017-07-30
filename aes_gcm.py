@@ -59,8 +59,8 @@ class AES_GCM:
         self.change_key(master_key)
 
     def change_key(self, master_key):
-        if type(master_key) == str:
-            # Assume this is a good key in a bytearray/bytes
+        if type(master_key) in [bytes, str]:
+            # Assume this is a good key in a bytearray/bytes/string
             self.__master_key = master_key
         elif master_key <= (1 << 128):
             self.__master_key = long_to_bytes(master_key, 16)
@@ -120,7 +120,7 @@ class AES_GCM:
         return tag
 
     def encrypt(self, init_value, plaintext, auth_data=b''):
-        if type(init_value) == str:
+        if type(init_value) in [bytes, str]:
             # Assume the IV is provided as bytes
             init_value = bytes_to_long(init_value)
         if init_value >= (1 << 96):
@@ -162,9 +162,9 @@ class AES_GCM:
 
     def decrypt(self, init_value, ciphertext, auth_tag, auth_data=b''):
         # Assume the IV and/or auth tag are provided as byte arrays when they look like strings
-        if type(init_value) == str:
+        if type(init_value) in [bytes, str]:
             init_value = bytes_to_long(init_value)
-        if type(auth_tag) == str:
+        if type(auth_tag) in [bytes, str]:
             auth_tag = bytes_to_long(auth_tag)
 
         if init_value >= (1 << 96):

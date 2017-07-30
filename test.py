@@ -147,16 +147,19 @@ if __name__ == '__main__':
 
     for test_data in test_cases:
         test_tag = test_data['auth_tag']
-        if type(test_data['auth_tag']) == str:
+        if type(test_data['auth_tag']) in [bytes, str]:
             test_tag = bytes_to_long(test_data['auth_tag'])
-            
+
         test_gcm = AES_GCM(test_data['master_key'])
         encrypted, tag = test_gcm.encrypt(
             test_data['init_value'],
             test_data['plaintext'],
             test_data['auth_data']
         )
-        enc_dbg = '\\x' + '\\x'.join('{:02x}'.format(ord(x)) for x in encrypted)
+        if type(encrypted) == str:
+            enc_dbg = '\\x' + '\\x'.join('{:02x}'.format(ord(x)) for x in encrypted)
+        else:
+            enc_dbg = '\\x' + '\\x'.join('{:02x}'.format(x) for x in encrypted)
         tag_dbg = hex(tag)
 
         states = []
