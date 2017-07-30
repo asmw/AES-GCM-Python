@@ -59,10 +59,20 @@ class AES_GCM:
         self.change_key(master_key)
 
     def change_key(self, master_key):
-        if master_key >= (1 << 128):
-            raise InvalidInputException('Master key should be 128-bit')
+        if type(master_key) == str:
+            # Assume this is a good key in a bytearray/bytes
+            self.__master_key = master_key
+        elif master_key <= (1 << 128):
+            self.__master_key = long_to_bytes(master_key, 16)
+        elif master_key <= (1 << 192):
+            self.__master_key = long_to_bytes(master_key, 24)
+        elif master_key <= (1 << 256):
+            self.__master_key = long_to_bytes(master_key, 32)
 
-        self.__master_key = long_to_bytes(master_key, 16)
+        if len(self.__master_key) > 32:
+            raise InvalidInputException(
+                'Master key should be 128, 192 or 256-bit, (got: %s)' % len(self.__master_key * 8))
+
         self.__aes_ecb = AES.new(self.__master_key, AES.MODE_ECB)
         self.__auth_key = bytes_to_long(self.__aes_ecb.encrypt(b'\x00' * 16))
 
@@ -110,6 +120,9 @@ class AES_GCM:
         return tag
 
     def encrypt(self, init_value, plaintext, auth_data=b''):
+        if type(init_value) == str:
+            # Assume the IV is provided as bytes
+            init_value = bytes_to_long(init_value)
         if init_value >= (1 << 96):
             raise InvalidInputException('IV should be 96-bit')
         # a naive checking for IV reuse
@@ -148,6 +161,12 @@ class AES_GCM:
         return ciphertext, auth_tag
 
     def decrypt(self, init_value, ciphertext, auth_tag, auth_data=b''):
+        # Assume the IV and/or auth tag are provided as byte arrays when they look like strings
+        if type(init_value) == str:
+            init_value = bytes_to_long(init_value)
+        if type(auth_tag) == str:
+            auth_tag = bytes_to_long(auth_tag)
+
         if init_value >= (1 << 96):
             raise InvalidInputException('IV should be 96-bit')
         if auth_tag >= (1 << 128):

@@ -25,7 +25,8 @@
 from aes_gcm import AES_GCM
 from pprint import pprint
 from Crypto.Random.random import getrandbits
-from Crypto.Util.number import long_to_bytes
+from Crypto.Util.number import long_to_bytes, bytes_to_long
+from Crypto.Hash import SHA256
 
 test_cases = ({
     'master_key': 0x00000000000000000000000000000000,
@@ -34,6 +35,57 @@ test_cases = ({
     'init_value': 0x000000000000000000000000,
     'ciphertext': b'',
     'auth_tag':   0x58e2fccefa7e3061367f1d57a4e7455a,
+}, {
+    'name':      '192 bit key',
+    'master_key': 0xfffffffffffffffffffffffffffffffff,
+    'plaintext':  b'\x00\x00\x00\x00\x00\x00\x00\x00' +
+                  b'\x00\x00\x00\x00\x00\x00\x00\x00',
+    'auth_data':  b'',
+    'init_value': 0x000000000000000000000000,
+    'ciphertext': b'\x72\x3e\x3e\x28\x03\x9e\xb7\x8c' +
+                  b'\xd2\x95\x39\x7f\x9c\x27\x08\x32',
+    'auth_tag':   0xe2deabd0b0d93a417facac9df9f6cf91,
+}, {
+    'name':      '256 bit key as byte array, IV as byte array',
+    'master_key': SHA256.new("").digest(),
+    'plaintext':  b'\x00\x00\x00\x00\x00\x00\x00\x00' +
+                  b'\x00\x00\x00\x00\x00\x00\x00\x00',
+    'auth_data':  b'',
+    'init_value': b'\x00\x00\x00\x00\x00\x00\x00\x00',
+    'ciphertext': b'\x09\x33\x71\x35\x75\xe5\x1b\x11' +
+                  b'\xca\xab\x53\x99\xb8\x8d\x48\xc6',
+    'auth_tag':   0x761b53ebf18f95502fcd10865ba91e17,
+}, {
+    'name':      '256 bit key as byte array, IV and auth tag as byte array',
+    'master_key': SHA256.new("").digest(),
+    'plaintext':  b'\x00\x00\x00\x00\x00\x00\x00\x00' +
+                  b'\x00\x00\x00\x00\x00\x00\x00\x00',
+    'auth_data':  b'',
+    'init_value': b'\x00\x00\x00\x00\x00\x00\x00\x00',
+    'ciphertext': b'\x09\x33\x71\x35\x75\xe5\x1b\x11' +
+                  b'\xca\xab\x53\x99\xb8\x8d\x48\xc6',
+    'auth_tag':   b'\x76\x1b\x53\xeb\xf1\x8f\x95\x50' +
+                  b'\x2f\xcd\x10\x86\x5b\xa9\x1e\x17',
+}, {
+    'name':      '256 bit key as byte array',
+    'master_key': SHA256.new("").digest(),
+    'plaintext':  b'\x00\x00\x00\x00\x00\x00\x00\x00' +
+                  b'\x00\x00\x00\x00\x00\x00\x00\x00',
+    'auth_data':  b'',
+    'init_value': 0x000000000000000000000000,
+    'ciphertext': b'\x09\x33\x71\x35\x75\xe5\x1b\x11' +
+                  b'\xca\xab\x53\x99\xb8\x8d\x48\xc6',
+    'auth_tag':   0x761b53ebf18f95502fcd10865ba91e17,
+}, {
+    'name':      '256 bit key',
+    'master_key': bytes_to_long(SHA256.new("").digest()),
+    'plaintext':  b'\x00\x00\x00\x00\x00\x00\x00\x00' +
+                  b'\x00\x00\x00\x00\x00\x00\x00\x00',
+    'auth_data':  b'',
+    'init_value': 0x000000000000000000000000,
+    'ciphertext': b'\x09\x33\x71\x35\x75\xe5\x1b\x11' +
+                  b'\xca\xab\x53\x99\xb8\x8d\x48\xc6',
+    'auth_tag':   0x761b53ebf18f95502fcd10865ba91e17,
 }, {
     'master_key': 0x00000000000000000000000000000000,
     'plaintext':  b'\x00\x00\x00\x00\x00\x00\x00\x00' +
@@ -94,12 +146,18 @@ if __name__ == '__main__':
     num_failures = 0
 
     for test_data in test_cases:
+        test_tag = test_data['auth_tag']
+        if type(test_data['auth_tag']) == str:
+            test_tag = bytes_to_long(test_data['auth_tag'])
+            
         test_gcm = AES_GCM(test_data['master_key'])
         encrypted, tag = test_gcm.encrypt(
             test_data['init_value'],
             test_data['plaintext'],
             test_data['auth_data']
         )
+        enc_dbg = '\\x' + '\\x'.join('{:02x}'.format(ord(x)) for x in encrypted)
+        tag_dbg = hex(tag)
 
         states = []
         tags = []
@@ -129,16 +187,19 @@ if __name__ == '__main__':
         decrypted = test_gcm.decrypt(
             test_data['init_value'],
             encrypted,
-            tag,
+            test_data['auth_tag'],
             test_data['auth_data']
         )
 
         if encrypted != test_data['ciphertext'] or \
-                tag != test_data['auth_tag'] or \
+                tag != test_tag or \
                 decrypted != test_data['plaintext']:
             num_failures += 1
             print('This test case failed:')
             pprint(test_data)
+            print("Encrypted: %s (%s)" % (enc_dbg, encrypted == test_data['ciphertext']))
+            print("Tag: %s (%s)" % (tag_dbg, tag == test_data['auth_tag']))
+            print("Decrypted: %s (%s)" % (decrypted, decrypted == test_data['plaintext']))
             print()
 
     if num_failures == 0:
