@@ -31,15 +31,25 @@ def process(line):
         test_crypttext = b'' if (len(current_test['CT']) == 0) else long_to_bytes(int(current_test['CT'], 16))
         test_plaintext = b'' if (len(current_test['PT']) == 0) else long_to_bytes(int(current_test['PT'], 16))
         test_iv = int(current_test['IV'], 16)
-        computed_crypttext, computed_tag = test_gcm.encrypt(
-            test_iv,
-            test_plaintext,
-            test_aad)
+        tag_len = int(int(current_test_parameters['Taglen']) / 8)
+        try:
+            computed_crypttext, computed_tag = test_gcm.encrypt(
+                test_iv,
+                test_plaintext,
+                test_aad,
+                tag_len)
+        except ValueError as e:
+            errors.append(e)
         if computed_tag != test_tag:
             errors.append("Tag mismatch after encryption")
         computed_plaintext = b''
         try:
-            computed_plaintext = test_gcm.decrypt(test_iv, test_crypttext, test_tag, test_aad)
+            computed_plaintext = test_gcm.decrypt(
+                test_iv,
+                test_crypttext,
+                test_tag,
+                test_aad,
+                tag_len)
             if computed_plaintext != test_plaintext:
                 errors.append("Plaintext mismatch")
         except InvalidTagException:
@@ -53,9 +63,15 @@ def process(line):
             print("Test case:")
             print(current_test)
             print(errors)
-            print("Crypttext:", test_crypttext, computed_crypttext)
-            print("Plaintext:", test_plaintext, computed_plaintext)
-            print("Tags:", test_tag, computed_tag)
+            print("Crypttext")
+            print(" Test:     %s" % test_crypttext)
+            print(" Computed: %s" % computed_crypttext)
+            print("Plaintext")
+            print(" Test:     %s" % test_plaintext)
+            print(" Computed: %s" % computed_plaintext)
+            print("Tags")
+            print(" Test:     %s" % hex(test_tag))
+            print(" Computed: %s" % hex(computed_tag))
             print("Failed: %s | Success: %s" % (fail_count, success_count))
         else:
             success_count += 1
@@ -75,8 +91,14 @@ def process(line):
 
 print("Parsing")
 
+total = 0
+last = 0
 for line in fileinput.input():
     process(line)
+    total = success_count + fail_count
+    if (total % 20) == 0 and last != total:
+        print("Failed: %s | Success: %s" % (fail_count, success_count))
+        last = total
 
 print("Success: %s" % success_count)
 print("Failed: %s" % fail_count)
