@@ -119,7 +119,7 @@ class AES_GCM:
 
         return tag
 
-    def encrypt(self, init_value, plaintext, auth_data=b''):
+    def encrypt(self, init_value, plaintext, auth_data=b'', tag_len = 16):
         if type(init_value) in [bytes, str]:
             # Assume the IV is provided as bytes
             init_value = bytes_to_long(init_value)
@@ -158,13 +158,15 @@ class AES_GCM:
 
         # assert len(ciphertext) == len(plaintext)
         assert auth_tag < (1 << 128)
+        auth_tag = auth_tag >> (16 - tag_len) * 8
         return ciphertext, auth_tag
 
-    def decrypt(self, init_value, ciphertext, auth_tag, auth_data=b''):
+    def decrypt(self, init_value, ciphertext, auth_tag, auth_data=b'', tag_len = 16):
         # Assume the IV and/or auth tag are provided as byte arrays when they look like strings
         if type(init_value) in [bytes, str]:
             init_value = bytes_to_long(init_value)
         if type(auth_tag) in [bytes, str]:
+            tag_len = int(len(auth_tag) / 8)
             auth_tag = bytes_to_long(auth_tag)
 
         if init_value >= (1 << 96):
@@ -172,9 +174,11 @@ class AES_GCM:
         if auth_tag >= (1 << 128):
             raise InvalidInputException('Tag should be 128-bit')
 
-        if auth_tag != self.__ghash(auth_data, ciphertext) ^ \
+        ghash = self.__ghash(auth_data, ciphertext) ^ \
                 bytes_to_long(self.__aes_ecb.encrypt(
-                long_to_bytes((init_value << 32) | 1, 16))):
+                long_to_bytes((init_value << 32) | 1, 16)))
+        ghash = ghash >> (16 - tag_len) * 8
+        if auth_tag != ghash:
             raise InvalidTagException
 
         len_ciphertext = len(ciphertext)
